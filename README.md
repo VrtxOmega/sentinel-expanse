@@ -154,6 +154,38 @@ Generates 10MB of synthetic structured logs (auth events, DB timeouts, kernel sy
 
 ---
 
+## ◈ Weisman Score Dashboard
+
+Here's what was built at `C:\Veritas_Lab\sentinel-expanse\dashboard\`:
+
+```text
+dashboard/
+├── app.py                        # Flask server (13 KB)
+├── templates/dashboard.html       # Dark UI with side-by-side cards (25 KB)
+├── static/css/style.css           # Engineering dark theme (13 KB)
+├── compressed_sentinel/           # Sentinel v5.1 output files
+├── compressed_zlib/               # ZLIB output files
+├── uploads/                       # Incoming file storage
+└── results/sessions.json         # Session history persistence
+```
+
+**What it does:**
+
+1. **Upload** — drag-and-drop or browse for two files (up to 2 GB each)
+2. **Compresses both** with Sentinel v5.1 (GodTierEngine) and ZLIB Level 6
+3. **Scores each** using `Weisman Score = Ratio × Speed (MB/s)` — higher is better, rewards both compression ratio AND throughput
+4. **Verifies** bit-perfect integrity after decompression (SHA-256)
+5. **Displays** side-by-side per-file results: ratio, speed, Weisman, time, hash, integrity, download link
+6. **Session history** persists across restarts via JSON
+7. **Overall winner** computed as sum of Weisman Scores across both files
+
+**To start the server:**
+```bash
+cd C:\Veritas_Lab\sentinel-expanse\dashboard
+python app.py
+```
+
+---
 ## ◈ Repository Structure
 
 ```
