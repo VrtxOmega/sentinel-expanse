@@ -328,24 +328,172 @@ The multi-dictionary approach from Sentinel v6 was not carried forward into the 
 
 ---
 
-## 12. Suggested Repo Structure
+## 12. Repository Structure
 
 ```
-project-sentinel-expanse/
+sentinel-expanse/
 ├── README.md
 ├── TECHNICAL_MANUAL.md          (this document)
-├── sentinel_expanse.py          (Python research engine)
-├── sentinel_v6.c                (C production engine)
-├── sentinel_v7.c                (C updated engine)
-├── benchmark_harness.py         (benchmark suite)
+├── LICENSE
+│
+├── python/
+│   ├── sentinel_expanse.py      (Python research engine — v5 + v6)
+│   └── benchmark_harness.py     (benchmark suite with synthetic log generator)
+│
+├── c/
+│   ├── sentinel_v6.c            (C production engine)
+│   ├── sentinel_v7.c            (C updated engine)
+│   └── Makefile                 (build + test targets)
+│
 ├── tests/
-│   └── test_roundtrip.py       (bit-perfect verification)
-└── docs/
-    ├── weisman_score.md         (metric definition)
-    └── format_spec.md           (binary format reference)
+│   └── test_roundtrip.py        (bit-perfect verification — v5, v6, native)
+│
+├── dashboard/
+│   ├── app.py                   (Flask server — 13 KB)
+│   ├── templates/
+│   │   └── dashboard.html       (Dark UI with side-by-side cards — 25 KB)
+│   ├── static/css/
+│   │   └── style.css            (Engineering dark theme — 13 KB)
+│   ├── compressed_sentinel/     (Sentinel v5.1 output files)
+│   ├── compressed_zlib/         (ZLIB output files)
+│   ├── uploads/                 (Incoming file storage)
+│   └── results/
+│       └── sessions.json        (Session history persistence)
+│
+├── docs/
+│   ├── weisman_score.md         (metric definition)
+│   └── format_spec.md           (binary format reference)
+│
+├── .github/
+│   └── workflows/ci.yml         (GitHub Actions CI pipeline)
+│
+└── data/
+    └── .gitkeep
 ```
 
 ---
 
-*Technical manual generated from source code analysis.*
+## 13. Weisman Score Dashboard
+
+The `dashboard/` directory contains a Flask-based web application for visual, side-by-side compression benchmarking. It is the interactive evaluation frontend for the Sentinel-Expanse engine.
+
+### 13.1 Architecture
+
+```
+                          ┌──────────────────────────┐
+                          │    dashboard.html (UI)    │
+                          │  JetBrains Mono + Inter   │
+                          │  Drag-and-drop upload     │
+                          │  Side-by-side result cards│
+                          │  Session history panel    │
+                          └──────────┬───────────────┘
+                                     │ POST /upload
+                                     ▼
+                          ┌──────────────────────────┐
+                          │       app.py (Flask)       │
+                          │  Port 5555 · 2GB max       │
+                          │                            │
+                          │  1. Read file_a, file_b    │
+                          │  2. ZLIB Level 6 compress  │
+                          │  3. Sentinel v5.1 compress │
+                          │  4. Compute Weisman Scores │
+                          │  5. SHA-256 verify         │
+                          │  6. Store + respond JSON   │
+                          └──────────────────────────┘
+                           │             │            │
+                     compressed_zlib/  compressed_sentinel/  results/sessions.json
+```
+
+### 13.2 Key Components
+
+| File | Size | Purpose |
+|------|------|---------|
+| `app.py` | 13 KB | Flask server with embedded `GodTierEngine` (v5.1), ZLIB baseline, Weisman computation, SHA-256 integrity verification, JSON session persistence |
+| `dashboard.html` | 25 KB | Dark-themed responsive UI with drag-and-drop upload zones, animated progress bar, side-by-side engine comparison cards, per-file winner badges, session history timeline |
+| `style.css` | 13 KB | Engineering dark theme with JetBrains Mono for metrics, Inter for UI text, glassmorphism cards, gold accent highlights |
+
+### 13.3 API Endpoints
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/` | GET | Dashboard UI |
+| `/upload` | POST | Accept two files (`file_a`, `file_b`), compress with both engines, return JSON results |
+| `/result/<sid>` | GET | Retrieve results for a session by ID |
+| `/download/<filename>` | GET | Download a compressed output file |
+| `/history` | GET | Return all stored sessions as JSON array |
+
+### 13.4 Compression Pipeline
+
+For each uploaded file, the server runs two independent compression pipelines:
+
+1. **ZLIB (Level 6)** — `zlib.compress(data, level=6)` — raw zlib with no dictionary
+2. **Sentinel v5.1 (GodTierEngine)** — streaming compressor with adaptive 32KB dictionary extracted from first bytes of input, Adler-32 chunk integrity, binary `SNTL` container
+
+Each pipeline produces:
+- **Compressed output** saved to `compressed_zlib/` or `compressed_sentinel/`
+- **Weisman Score** = `Compression Ratio × Throughput (MB/s)`
+- **SHA-256 hash** of compressed output
+- **Integrity verification** via decompress-and-compare
+
+### 13.5 Running the Dashboard
+
+```bash
+cd dashboard
+pip install flask          # Only dependency
+python app.py              # Starts on http://127.0.0.1:5555
+```
+
+The server loads any previously stored sessions from `results/sessions.json` on startup.
+
+### 13.6 UI Workflow
+
+1. **Upload** — Drag-and-drop or browse for two files (up to 2 GB each)
+2. **Processing** — Animated progress bar while compression runs server-side
+3. **Results** — Side-by-side comparison cards showing:
+   - Original size, compressed size, ratio
+   - Throughput (MB/s), elapsed time
+   - Weisman Score (highlighted)
+   - SHA-256 fingerprint
+   - Integrity status (✓ PASS / ✗ FAIL)
+   - Per-file winner badge (Sentinel vs ZLIB)
+4. **Summary** — Overall Weisman totals and session winner
+5. **History** — Scrollable timeline of past benchmark sessions
+
+---
+
+## 14. Live Benchmark Results
+
+The following results were obtained from `benchmark_harness.py` on 10 MB of synthetic structured log data (3 template patterns: `Service.Auth`, `Database.Connection`, `Kernel`). Each engine was run 5 times. Values shown are mean ± standard deviation.
+
+```
+────────────────────────────────────────────────────────────
+WEISMAN EVALUATION (Disk-to-Disk) — 5 Repetitions × 10 MB
+────────────────────────────────────────────────────────────
+Engine          | Ratio  | Speed (MB/s)  | WEISMAN        |
+----------------|--------|---------------|----------------|
+ZLIB (Level 6)  | 7.36×  | 115.81 MB/s   | 852.89 (±13.2) |
+LZMA (Preset 1) | 7.98×  | 29.89 MB/s    | 238.64 (±13.9) |
+SENTINEL (v5)   | 6.98×  | 187.98 MB/s   | 1311.42 (±23.4)|
+────────────────────────────────────────────────────────────
+VERIFICATION: PASS (Bit-Perfect)
+```
+
+### 14.1 Analysis
+
+- **Sentinel v5 wins the Weisman Score by 54%** over ZLIB despite a slightly lower compression ratio (6.98× vs 7.36×). The adaptive dictionary delivers 62% higher throughput (188 vs 116 MB/s), which more than compensates for the ratio delta.
+- **LZMA achieves the best ratio** (7.98×) but its 30 MB/s throughput produces the lowest Weisman Score — 3.6× worse than ZLIB and 5.5× worse than Sentinel. This confirms the Weisman metric's utility: it correctly penalizes slow-but-compressive algorithms for real-world use.
+- **Standard deviation** is low across all engines (1.5–5.8% relative), indicating stable, repeatable benchmarks suitable for comparative evaluation.
+
+### 14.2 Test Suite Verification
+
+```
+tests/test_roundtrip.py::test_god_tier_roundtrip             PASSED
+tests/test_roundtrip.py::test_sentinel_v6_python_roundtrip   PASSED
+```
+
+Both Python engines pass bit-perfect SHA-256 roundtrip verification on 1 MB synthetic data.
+
+---
+
+*Technical manual generated from source code analysis and live benchmark data.*
 *Project Sentinel-Expanse — Copyright 2026 RJ Lopez / VRTXOmega*
