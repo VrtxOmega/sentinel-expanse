@@ -66,10 +66,14 @@ def benchmark_disk():
         with open(i, 'rb') as f_in, open(o, 'wb') as f_out:
             f_out.write(lzma.compress(f_in.read(), preset=1))
 
+    def run_god_tier(i, o):
+        with open(i, 'rb') as f_in, open(o, 'wb') as f_out:
+            GodTierEngine().compress_stream(f_in, f_out)
+
     engines = [
         ("ZLIB (Level 6)", run_zlib),
         ("LZMA (Preset 1)", run_lzma),
-        ("SENTINEL (v5)", lambda i,o: GodTierEngine().compress(i, o))
+        ("SENTINEL (v5)", run_god_tier)
     ]
     
     results = {}
@@ -110,7 +114,10 @@ def benchmark_disk():
 
     # Final Verification of Sentinel
     eng = GodTierEngine()
-    eng.decompress(COMPRESSED_FILE + ".bin", DECOMPRESSED_FILE)
+    with open(TEST_FILE, 'rb') as f_in, open(COMPRESSED_FILE + ".bin", 'wb') as f_out:
+        eng.compress_stream(f_in, f_out)
+    with open(COMPRESSED_FILE + ".bin", 'rb') as f_in, open(DECOMPRESSED_FILE, 'wb') as f_out:
+        eng.decompress_stream(f_in, f_out)
     h1 = hashlib.sha256(open(TEST_FILE,'rb').read()).hexdigest()
     h2 = hashlib.sha256(open(DECOMPRESSED_FILE,'rb').read()).hexdigest()
     
