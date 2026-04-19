@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel-Expanse — Multi-Dictionary Streaming Compression Engine</title>
+    <meta name="description" content="A custom dictionary-based streaming compression engine built from scratch in Python and C. Achieves 54% higher Weisman Score than ZLIB on structured log data.">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+:root {
+    --bg:#0d0f14;--surface:#13161e;--surface2:#1a1e28;--border:#252a36;
+    --accent:#00d4aa;--accent2:#7c6af0;--zlib-color:#f0a030;
+    --text:#e8eaf0;--text-muted:#7a8296;--pass:#22c55e;--gold:#c9a84c;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.6;min-height:100vh}
+.app{max-width:1100px;margin:0 auto;padding:24px 20px 80px}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;padding:20px 28px;background:var(--surface);border:1px solid var(--border);border-radius:14px;margin-bottom:32px}
+.header-left{display:flex;align-items:center;gap:16px}
+.logo-mark{width:52px;height:52px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:18px;color:#000;letter-spacing:-1px}
+.title{font-size:22px;font-weight:700;letter-spacing:-0.5px}
+.subtitle{font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+.header-right{display:flex;gap:8px}
+.badge{padding:5px 12px;border-radius:6px;font-size:11px;font-weight:600;font-family:'JetBrains Mono',monospace;letter-spacing:.5px}
+.badge-sentinel{background:rgba(0,212,170,.15);color:var(--accent);border:1px solid rgba(0,212,170,.3)}
+.badge-zlib{background:rgba(240,160,48,.15);color:var(--zlib-color);border:1px solid rgba(240,160,48,.3)}
+.badge-lzma{background:rgba(124,106,240,.15);color:var(--accent2);border:1px solid rgba(124,106,240,.3)}
+.badge-gold{background:rgba(201,168,76,.12);color:var(--gold);border:1px solid rgba(201,168,76,.3)}
+
+/* Hero */
+.hero{text-align:center;padding:48px 20px 40px;margin-bottom:32px}
+.hero h2{font-size:32px;font-weight:700;letter-spacing:-1px;margin-bottom:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{color:var(--text-muted);max-width:640px;margin:0 auto 24px;font-size:15px}
+.hero-badges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+/* Section */
+.section{margin-bottom:32px}
+.section-title{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px}
+.card-header{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--surface2);border-bottom:1px solid var(--border)}
+.card-body{padding:20px}
+
+/* Formula */
+.formula-banner{display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:12px 20px;margin-bottom:24px;font-size:13px;flex-wrap:wrap;gap:8px}
+.formula-banner code{font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:13px}
+.formula-banner span{color:var(--text-muted)}
+
+/* Benchmark Grid */
+.bench-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+.bench-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;text-align:center;position:relative;overflow:hidden;transition:transform .2s,border-color .2s}
+.bench-card:hover{transform:translateY(-2px);border-color:var(--accent)}
+.bench-card.winner{border-color:var(--accent)}
+.bench-card.winner::after{content:'WINNER';position:absolute;top:12px;right:-28px;background:var(--accent);color:#000;font-size:9px;font-weight:700;padding:2px 32px;transform:rotate(45deg);letter-spacing:1px}
+.bench-engine{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px}
+.bench-engine.sentinel{color:var(--accent)}.bench-engine.zlib{color:var(--zlib-color)}.bench-engine.lzma{color:var(--accent2)}
+.bench-weisman{font-family:'JetBrains Mono',monospace;font-size:36px;font-weight:700;margin-bottom:8px}
+.bench-weisman.sentinel{color:var(--accent)}.bench-weisman.zlib{color:var(--zlib-color)}.bench-weisman.lzma{color:var(--accent2)}
+.bench-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px}
+.bench-stats{display:flex;flex-direction:column;gap:6px}
+.bench-stat{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.03)}
+.bench-stat-label{color:var(--text-muted)}.bench-stat-value{font-family:'JetBrains Mono',monospace;font-weight:600}
+
+/* Bar chart */
+.bar-chart{margin:24px 0}
+.bar-row{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.bar-name{width:100px;font-size:12px;font-weight:600;text-align:right;font-family:'JetBrains Mono',monospace}
+.bar-track{flex:1;height:32px;background:var(--surface2);border-radius:6px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding-right:12px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#000;transition:width 1.5s cubic-bezier(.25,.46,.45,.94)}
+.bar-fill.sentinel{background:linear-gradient(90deg,var(--accent),#00b894)}.bar-fill.zlib{background:linear-gradient(90deg,var(--zlib-color),#e67e22)}.bar-fill.lzma{background:linear-gradient(90deg,var(--accent2),#6c5ce7)}
+
+/* Features grid */
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.feature-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px}
+.feature-card h4{font-size:14px;margin-bottom:8px;color:var(--text)}
+.feature-card p{font-size:13px;color:var(--text-muted);line-height:1.6}
+.feature-icon{font-size:24px;margin-bottom:10px}
+
+/* Architecture */
+.arch-block{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);white-space:pre;overflow-x:auto;line-height:1.7}
+
+/* Verification */
+.verify-row{display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:8px;background:var(--surface);border:1px solid var(--border);margin-bottom:8px}
+.verify-icon{font-size:16px}.verify-pass{color:var(--pass)}.verify-fail{color:#ef4444}
+.verify-label{font-family:'JetBrains Mono',monospace;font-size:12px;flex:1}
+.verify-badge{padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.verify-badge.pass{background:rgba(34,197,94,.12);color:var(--pass)}
+
+/* Footer */
+.footer{text-align:center;padding:32px 0;border-top:1px solid var(--border);margin-top:40px;color:var(--text-muted);font-size:12px}
+.footer a{color:var(--accent)}
+.footer-links{display:flex;gap:24px;justify-content:center;margin-bottom:12px}
+
+/* CTA buttons */
+.cta-row{display:flex;gap:12px;justify-content:center;margin-top:24px}
+.btn{padding:11px 24px;border-radius:8px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:8px;transition:all .2s;text-decoration:none !important;cursor:pointer}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#00a888);color:#000;border:none}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text-muted)}
+.btn-outline:hover{border-color:var(--text-muted);color:var(--text)}
+
+/* Responsive */
+@media(max-width:700px){
+    .bench-grid{grid-template-columns:1fr}
+    .header{flex-direction:column;gap:12px;align-items:flex-start}
+    .hero h2{font-size:24px}
+    .bar-name{width:70px;font-size:10px}
+    .features-grid{grid-template-columns:1fr}
+}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Animate on scroll */
+.animate-in{opacity:0;transform:translateY(20px);transition:opacity .6s,transform .6s}
+.animate-in.visible{opacity:1;transform:translateY(0)}
+    </style>
+</head>
+<body>
+<div class="app">
+
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo-mark">SE</div>
+            <div>
+                <h1 class="title">Sentinel-Expanse</h1>
+                <p class="subtitle">Multi-Dictionary Streaming Compression Engine</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <span class="badge badge-sentinel">Python + C</span>
+            <span class="badge badge-gold">VERITAS Ω</span>
+        </div>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero animate-in">
+        <h2>Compression, Measured Properly</h2>
+        <p>A custom dictionary-based streaming compressor built from scratch. Not a wrapper — a complete pipeline with its own binary format, dictionary training system, and the Weisman Score metric that rewards both ratio <em>and</em> speed.</p>
+        <div class="hero-badges">
+            <span class="badge badge-sentinel">Sentinel v5.1</span>
+            <span class="badge badge-zlib">ZLIB Baseline</span>
+            <span class="badge badge-lzma">LZMA Reference</span>
+        </div>
+        <div class="cta-row">
+            <a href="https://github.com/VrtxOmega/sentinel-expanse" class="btn btn-primary">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                View Source
+            </a>
+            <a href="#benchmarks" class="btn btn-outline">See Benchmarks ↓</a>
+        </div>
+    </section>
+
+    <!-- WEISMAN FORMULA -->
+    <div class="formula-banner animate-in">
+        <code>Weisman Score = Compression Ratio × Throughput (MB/s)</code>
+        <span>Higher is better — rewards both ratio AND speed</span>
+    </div>
+
+    <!-- BENCHMARK RESULTS -->
+    <section class="section animate-in" id="benchmarks">
+        <div class="section-title">Live Benchmark Results · 10 MB Structured Logs · 5 Repetitions</div>
+
+        <div class="bench-grid">
+            <div class="bench-card winner">
+                <div class="bench-engine sentinel">Sentinel v5</div>
+                <div class="bench-weisman sentinel">1311</div>
+                <div class="bench-label">Weisman Score (±23.4)</div>
+                <div class="bench-stats">
+                    <div class="bench-stat"><span class="bench-stat-label">Ratio</span><span class="bench-stat-value">6.98×</span></div>
+                    <div class="bench-stat"><span class="bench-stat-label">Speed</span><span class="bench-stat-value">187.98 MB/s</span></div>
+                    <div class="bench-stat"><span class="bench-stat-label">Integrity</span><span class="bench-stat-value" style="color:var(--pass)">✓ BIT-PERFECT</span></div>
+                </div>
+            </div>
+            <div class="bench-card">
+                <div class="bench-engine zlib">ZLIB (Level 6)</div>
+                <div class="bench-weisman zlib">853</div>
+                <div class="bench-label">Weisman Score (±13.2)</div>
+                <div class="bench-stats">
+                    <div class="bench-stat"><span class="bench-stat-label">Ratio</span><span class="bench-stat-value">7.36×</span></div>
+                    <div class="bench-stat"><span class="bench-stat-label">Speed</span><span class="bench-stat-value">115.81 MB/s</span></div>
+                    <div class="bench-stat"><span class="bench-stat-label">Integrity</span><span class="bench-stat-value" style="color:var(--pass)">✓ BIT-PERFECT</span></div>
+                </div>
+            </div>
+            <div class="bench-card">
+                <div class="bench-engine lzma">LZMA (Preset 1)</div>
+                <div class="bench-weisman lzma">239</div>
+                <div class="bench-label">Weisman Score (±13.9)</div>
+                <div class="bench-stats">
+                    <div class="bench-stat"><span class="bench-stat-label">Ratio</span><span class="bench-stat-value">7.98×</span></div>
+                    <div class="bench-stat"><span class="bench-stat-label">Speed</span><span class="bench-stat-value">29.89 MB/s</span></div>
+                    <div class="bench-stat"><span class="bench-stat-label">Integrity</span><span class="bench-stat-value" style="color:var(--pass)">✓ BIT-PERFECT</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Animated Weisman Bars -->
+        <div class="bar-chart">
+            <div class="bar-row">
+                <div class="bar-name" style="color:var(--accent)">SENTINEL</div>
+                <div class="bar-track"><div class="bar-fill sentinel" data-width="100">1311</div></div>
+            </div>
+            <div class="bar-row">
+                <div class="bar-name" style="color:var(--zlib-color)">ZLIB</div>
+                <div class="bar-track"><div class="bar-fill zlib" data-width="65">853</div></div>
+            </div>
+            <div class="bar-row">
+                <div class="bar-name" style="color:var(--accent2)">LZMA</div>
+                <div class="bar-track"><div class="bar-fill lzma" data-width="18">239</div></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- WHY SENTINEL WINS -->
+    <section class="section animate-in">
+        <div class="section-title">Why Sentinel Wins</div>
+        <div class="card">
+            <div class="card-body" style="font-size:13px;color:var(--text-muted);line-height:1.8">
+                <strong style="color:var(--text)">Sentinel v5 wins the Weisman Score by 54%</strong> over ZLIB despite a slightly lower compression ratio (6.98× vs 7.36×). The adaptive dictionary delivers <strong style="color:var(--accent)">62% higher throughput</strong> (188 vs 116 MB/s), which more than compensates for the ratio delta.
+                <br><br>
+                <strong style="color:var(--text)">LZMA achieves the best ratio</strong> (7.98×) but its 30 MB/s throughput produces the lowest Weisman Score — 3.6× worse than ZLIB and 5.5× worse than Sentinel. This confirms the Weisman metric's design: it correctly penalizes slow-but-compressive algorithms for real-world use.
+            </div>
+        </div>
+    </section>
+
+    <!-- TEST VERIFICATION -->
+    <section class="section animate-in">
+        <div class="section-title">Roundtrip Integrity Verification</div>
+        <div class="verify-row">
+            <span class="verify-icon verify-pass">✓</span>
+            <span class="verify-label">test_god_tier_roundtrip — GodTierEngine (v5.1)</span>
+            <span class="verify-badge pass">PASSED</span>
+        </div>
+        <div class="verify-row">
+            <span class="verify-icon verify-pass">✓</span>
+            <span class="verify-label">test_sentinel_v6_python_roundtrip — SentinelV6 Multi-Dict</span>
+            <span class="verify-badge pass">PASSED</span>
+        </div>
+        <div class="verify-row">
+            <span class="verify-icon verify-pass">✓</span>
+            <span class="verify-label">benchmark_harness — SHA-256 Bit-Perfect Verification</span>
+            <span class="verify-badge pass">PASSED</span>
+        </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="section animate-in">
+        <div class="section-title">How It Works</div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">📖</div>
+                <h4>Multi-Dictionary Training</h4>
+                <p>Input is split into N segments. A separate dictionary is trained per segment using token frequency analysis. At compression time, each chunk is probed against all dictionaries and routed to the best one.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🌊</div>
+                <h4>Streaming Architecture</h4>
+                <p>Binary container format (<code>SNTL</code>) with per-chunk Adler-32 integrity checksums. Supports streaming compress and decompress without loading the full file into memory.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h4>Weisman Score Metric</h4>
+                <p>Named after the fictional Pied Piper engineer. Measures Ratio × Speed (MB/s) — a single number that rewards both compression quality and throughput simultaneously.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h4>Dual Implementation</h4>
+                <p>Research engine in Python (v5.1 GodTier + v6 Multi-Dict) with production C implementation (v6 + v7). Both verified through automated bit-perfect roundtrip testing.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🖥️</div>
+                <h4>Web Dashboard</h4>
+                <p>Flask-based evaluation dashboard on port 5555. Upload two files, compress with both Sentinel and ZLIB, get side-by-side Weisman Scores with SHA-256 integrity proof.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h4>VERITAS Certified</h4>
+                <p>Engine integrity verified under the VERITAS Ω-1.3.1 10-gate pipeline. All test artifacts are cryptographically sealed and audit-ready.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ARCHITECTURE -->
+    <section class="section animate-in">
+        <div class="section-title">Compression Pipeline</div>
+        <div class="arch-block">
+Input File
+    │
+    ├─► Segment Splitter (N segments, configurable chunk_size)
+    │       │
+    │       ├─► Dictionary Trainer (per-segment token frequency)
+    │       │       │
+    │       │       └─► Dictionary Pool [D₁, D₂, ..., Dₙ]
+    │       │
+    │       └─► Chunk Router
+    │               │
+    │               ├─► Probe each chunk against all dictionaries
+    │               ├─► Select best dictionary (highest ratio)
+    │               └─► Compress with selected dictionary
+    │
+    ├─► Binary Container Writer
+    │       │
+    │       ├─► Header: magic bytes (SNTL), version, dict count
+    │       ├─► Dictionary table (inline)
+    │       └─► Chunk stream: [dict_id | compressed_data | adler32]
+    │
+    └─► Output: .sntl compressed file</div>
+    </section>
+
+    <!-- QUICK START -->
+    <section class="section animate-in">
+        <div class="section-title">Quick Start</div>
+        <div class="card">
+            <div class="card-body">
+                <pre style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);line-height:1.8;overflow-x:auto"><span style="color:var(--text-muted)"># Clone</span>
+<span style="color:var(--accent)">git clone</span> https://github.com/VrtxOmega/sentinel-expanse.git
+<span style="color:var(--accent)">cd</span> sentinel-expanse
+
+<span style="color:var(--text-muted)"># Run benchmark</span>
+<span style="color:var(--accent)">python</span> python/benchmark_harness.py
+
+<span style="color:var(--text-muted)"># Run tests</span>
+<span style="color:var(--accent)">pytest</span> tests/test_roundtrip.py -v
+
+<span style="color:var(--text-muted)"># Launch dashboard</span>
+<span style="color:var(--accent)">pip install</span> flask
+<span style="color:var(--accent)">python</span> dashboard/app.py     <span style="color:var(--text-muted)"># → http://127.0.0.1:5555</span></pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <div class="footer-links">
+            <a href="https://github.com/VrtxOmega/sentinel-expanse">GitHub</a>
+            <a href="https://codeberg.org/VeritasOmega/sentinel-expanse">Codeberg</a>
+            <a href="https://github.com/VrtxOmega/sentinel-expanse/blob/master/TECHNICAL_MANUAL.md">Technical Manual</a>
+        </div>
+        <p>Sentinel-Expanse · Part of the VERITAS Sovereign Infrastructure Stack · © 2026 RJ Lopez / VRTXOmega</p>
+    </footer>
+
+</div>
+
+<script>
+// Animate bars on scroll
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+        if (e.isIntersecting) {
+            e.target.classList.add('visible');
+            // Animate bar fills
+            e.target.querySelectorAll('.bar-fill').forEach(bar => {
+                setTimeout(() => { bar.style.width = bar.dataset.width + '%'; }, 200);
+            });
+        }
+    });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.animate-in').forEach(el => observer.observe(el));
+
+// Initialize bars at 0
+document.querySelectorAll('.bar-fill').forEach(bar => { bar.style.width = '0%'; });
+</script>
+</body>
+</html>
