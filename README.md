@@ -1,6 +1,6 @@
 <div align="center">
 
-# Ω SENTINEL-EXPANSE
+# Ω SENTINEL-Compression
 
 ### Multi-Dictionary Streaming Compression Engine
 
@@ -20,7 +20,7 @@
 
 ## ◈ What It Is
 
-Sentinel-Expanse is a custom dictionary-based streaming compression engine built from scratch in Python and C. It is **not** a wrapper around an existing algorithm — it is a complete compression pipeline with its own binary container format, dictionary training system, multi-dictionary chunk routing, and a custom performance metric.
+Sentinel-Compression is a custom dictionary-based streaming compression engine built from scratch in Python and C. It is **not** a wrapper around an existing algorithm — it is a complete compression pipeline with its own binary container format, dictionary training system, multi-dictionary chunk routing, and a custom performance metric.
 
 Inspired by the Pied Piper compression arc from Silicon Valley, this project started as a research exercise asking: *what actually makes a compression algorithm good?*
 
@@ -32,7 +32,7 @@ The answer informed the design of the [Omega Brain MCP](https://github.com/VrtxO
 
 Standard zlib uses a single 32KB sliding window as its compression dictionary — trained on the first bytes of a file regardless of what's in the rest of it.
 
-Sentinel-Expanse trains **multiple dictionaries** from different regions of the target data, then selects the best dictionary per chunk at compression time. For structured, repetitive data like AI-generated logs and provenance records, this produces measurably better results without sacrificing throughput.
+Sentinel-Compression trains **multiple dictionaries** from different regions of the target data, then selects the best dictionary per chunk at compression time. For structured, repetitive data like AI-generated logs and provenance records, this produces measurably better results without sacrificing throughput.
 
 ---
 
